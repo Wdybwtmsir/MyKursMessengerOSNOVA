@@ -1,4 +1,5 @@
 package ru.khrom.mykursmessenger.ui.theme
+
 import androidx.compose.ui.graphics.Color
 
 val Purple80 = Color(0xFFD0BCFF)
@@ -15,3 +16,5 @@ val TextPrimary = Color(0xFF1E293B)
 val TextSecondary = Color(0xFF64748B)
 val BubbleOut = Color(0xFF246BFD)
 val BubbleIn = Color(0xFFE2E8F0)
+
+val SplashBackground = Color(0xFF2260FF)

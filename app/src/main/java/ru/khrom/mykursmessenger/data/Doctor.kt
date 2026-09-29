@@ -6,5 +6,6 @@ data class Doctor(
     val specialty: String = "",
     val lastMessage: String = "",
     val time: String = "",
-    val isOnline: Boolean = false
+    val isOnline: Boolean = false,
+    val avatarRes: Int = 0
 )

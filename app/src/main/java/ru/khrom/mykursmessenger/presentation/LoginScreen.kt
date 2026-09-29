@@ -24,9 +24,7 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-
     val auth = FirebaseAuth.getInstance()
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -34,7 +32,6 @@ fun LoginScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Верхняя часть: Приветствие
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -56,8 +53,6 @@ fun LoginScreen(
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
-
-        // Средняя часть: Форма ввода
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -69,11 +64,12 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
                     focusedBorderColor = MedPrimary,
                     unfocusedBorderColor = TextSecondary.copy(alpha = 0.3f)
                 )
             )
-
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -82,11 +78,12 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
                     focusedBorderColor = MedPrimary,
                     unfocusedBorderColor = TextSecondary.copy(alpha = 0.3f)
                 )
             )
-
             if (errorMessage.isNotEmpty()) {
                 Text(
                     text = errorMessage,
@@ -97,8 +94,6 @@ fun LoginScreen(
                 )
             }
         }
-
-        // Нижняя часть: Кнопки
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -140,9 +135,7 @@ fun LoginScreen(
                     )
                 }
             }
-
             Spacer(modifier = Modifier.height(20.dp))
-
             Row(
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth()

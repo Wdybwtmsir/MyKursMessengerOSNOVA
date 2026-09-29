@@ -1,5 +1,6 @@
 package ru.khrom.mykursmessenger.presentation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,10 +10,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ru.khrom.mykursmessenger.R
 import ru.khrom.mykursmessenger.ui.theme.*
 
 @Composable
@@ -31,10 +34,25 @@ fun WelcomeScreen(onGetStartedClick: () -> Unit) {
                 .weight(1f),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "🩺", fontSize = 120.sp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(
+                    painter = painterResource(id = R.drawable.welcomelogo),
+                    contentDescription = null,
+                    modifier = Modifier.size(140.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Skin First",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MedPrimary,
+                    fontFamily = FontFamily.Default
+                )
+            }
         }
 
-        // Текстовый блок из макета
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -44,20 +62,23 @@ fun WelcomeScreen(onGetStartedClick: () -> Unit) {
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary,
-                textAlign = TextAlign.Center,
-                lineHeight = 34.sp
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                lineHeight = 34.sp,
+                fontFamily = FontFamily.Default
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "Консультируйтесь с сертифицированными дерматологами и специалистами в любое время и в любом месте.",
                 fontSize = 14.sp,
                 color = TextSecondary,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                lineHeight = 22.sp,
+                fontFamily = FontFamily.Default
             )
         }
 
         Spacer(modifier = Modifier.height(40.dp))
+
         Button(
             onClick = { onGetStartedClick() },
             modifier = Modifier
@@ -71,7 +92,8 @@ fun WelcomeScreen(onGetStartedClick: () -> Unit) {
                 text = "Начать работу",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = MedSurface
+                color = MedSurface,
+                fontFamily = FontFamily.Default
             )
         }
     }
