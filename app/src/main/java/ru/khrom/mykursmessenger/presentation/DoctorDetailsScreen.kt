@@ -1,6 +1,5 @@
 package ru.khrom.mykursmessenger.presentation
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,30 +17,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ru.khrom.mykursmessenger.R
-import ru.khrom.mykursmessenger.data.Doctor
+import coil.compose.AsyncImage
+import ru.khrom.mykursmessenger.data.DoctorRepository
 import ru.khrom.mykursmessenger.ui.theme.*
 
 @Composable
 fun DoctorDetailsScreen(doctorId: String, onBackClick: () -> Unit, onStartChatClick: () -> Unit) {
     val scrollState = rememberScrollState()
 
-    val doctors = remember {
-        listOf(
-            Doctor("1", "Д-р Александр Иванов", "Дерматолог", "Здравствуйте! Как ваши успехи с лечением?", "10:30", true, R.drawable.doc_alex),
-            Doctor("2", "Д-р Мария Петрова", "Аллерголог", "Пришлите, пожалуйста, результаты анализов.", "Вчера", false, R.drawable.doc_maria),
-            Doctor("3", "Д-р Сергей Смирнов", "Терапевт", "Жду вас на повторный прием в пятницу.", "2 дня назад", true, R.drawable.doc_sergey),
-            Doctor("4", "Д-р Елена Козлова", "Педиатр", "Рецепт на лекарство я обновила.", "05.10", false, R.drawable.doc_elena)
-        )
+    // Берем данные строго из сетевого репозитория DoctorRepository
+    val doctor = remember(doctorId) {
+        DoctorRepository.doctors.find { it.id == doctorId } ?: DoctorRepository.doctors.first()
     }
-
-    val doctor = doctors.find { it.id == doctorId } ?: doctors.first()
 
     Scaffold(
         containerColor = MedBackground
@@ -87,8 +79,9 @@ fun DoctorDetailsScreen(doctorId: String, onBackClick: () -> Unit, onStartChatCl
             ) {
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Image(
-                    painter = painterResource(id = doctor.avatarRes),
+                // Заменили Image на AsyncImage для сетевой аватарки URL
+                AsyncImage(
+                    model = doctor.avatarUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

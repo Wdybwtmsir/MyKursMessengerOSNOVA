@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -24,12 +23,18 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ru.khrom.mykursmessenger.data.Doctor
+import ru.khrom.mykursmessenger.data.DoctorRepository
 import ru.khrom.mykursmessenger.ui.theme.*
 
 data class TimeSlot(val time: String, val isAvailable: Boolean, val isSelected: Boolean = false)
 
 @Composable
-fun ScheduleScreen(doctorId: String, onBackClick: () -> Unit, onBookClick: () -> Unit) {
+fun ScheduleScreen(
+    doctorId: String,
+    onBackClick: () -> Unit,
+    onBookClick: (date: String, slot: String, forWhom: String, problem: String) -> Unit
+) {
     val scrollState = rememberScrollState()
 
     var selectedDateTab by remember { mutableIntStateOf(2) }
@@ -136,7 +141,7 @@ fun ScheduleScreen(doctorId: String, onBackClick: () -> Unit, onBookClick: () ->
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(timeSlots) { slot ->
+                        items(items = timeSlots) { slot: TimeSlot ->
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -223,7 +228,13 @@ fun ScheduleScreen(doctorId: String, onBackClick: () -> Unit, onBookClick: () ->
             ) {
                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
                     Button(
-                        onClick = { if (selectedTimeSlot.isNotEmpty()) onBookClick() },
+                        onClick = {
+                            if (selectedTimeSlot.isNotEmpty()) {
+                                val selectedDate = "September ${dates[selectedDateTab].day}, 2026 | ${dates[selectedDateTab].name}"
+                                val bookingFor = if (isForYourself) "Yourself" else "Another Person"
+                                onBookClick(selectedDate, selectedTimeSlot, bookingFor, noteText.ifBlank { "No description provided." })
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = SplashBackground),
                         shape = RoundedCornerShape(16.dp),

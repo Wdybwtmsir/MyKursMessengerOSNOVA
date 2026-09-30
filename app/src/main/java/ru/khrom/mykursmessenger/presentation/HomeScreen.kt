@@ -34,10 +34,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import ru.khrom.mykursmessenger.R
 import ru.khrom.mykursmessenger.data.Doctor
+import ru.khrom.mykursmessenger.data.DoctorRepository
 import ru.khrom.mykursmessenger.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 data class CalendarDay(
@@ -47,7 +47,12 @@ data class CalendarDay(
 )
 
 @Composable
-fun HomeScreen(onDoctorClick: (String) -> Unit) {
+fun HomeScreen(
+    onDoctorClick: (String) -> Unit,
+    onNotificationClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onDoctorsTabClick: () -> Unit
+) {
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
     val userId = auth.currentUser?.uid ?: ""
@@ -55,6 +60,9 @@ fun HomeScreen(onDoctorClick: (String) -> Unit) {
 
     var userName by remember { mutableStateOf("Пациент") }
     var userAvatarUri by remember { mutableStateOf<Uri?>(null) }
+
+    var homeSearchQuery by remember { mutableStateOf("") }
+    var isFavoriteTabSelected by remember { mutableStateOf(false) }
 
     LaunchedEffect(userId) {
         if (userId.isNotEmpty()) {
@@ -75,7 +83,6 @@ fun HomeScreen(onDoctorClick: (String) -> Unit) {
     val days = remember {
         val calendar = Calendar.getInstance()
         val currentDayOfMonth = calendar.get(Calendar.DAY_OF_MONTH)
-
         calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
 
         val dayList = mutableListOf<CalendarDay>()
@@ -105,13 +112,12 @@ fun HomeScreen(onDoctorClick: (String) -> Unit) {
         "$dayNum $dayName - Today"
     }
 
-    val doctors = remember {
-        listOf(
-            Doctor("1", "Д-р Александр Иванов", "Дерматолог", "Здравствуйте! Как ваши успехи с лечением?", "10:30", true, R.drawable.doc_alex),
-            Doctor("2", "Д-р Мария Петрова", "Аллерголог", "Пришлите, пожалуйста, результаты анализов.", "Вчера", false, R.drawable.doc_maria),
-            Doctor("3", "Д-р Сергей Смирнов", "Терапевт", "Жду вас на повторный прием в пятницу.", "2 дня назад", true, R.drawable.doc_sergey),
-            Doctor("4", "Д-р Елена Козлова", "Педиатр", "Рецепт на лекарство я обновила.", "05.10", false, R.drawable.doc_elena)
-        )
+    val doctors = remember { DoctorRepository.doctors }
+
+    val filteredDoctors = doctors.filter { doc ->
+        val matchesSearch = doc.name.contains(homeSearchQuery, ignoreCase = true) || doc.specialty.contains(homeSearchQuery, ignoreCase = true)
+        val matchesFavorite = !isFavoriteTabSelected || doc.isFavorite
+        matchesSearch && matchesFavorite
     }
 
     Scaffold(
@@ -184,14 +190,18 @@ fun HomeScreen(onDoctorClick: (String) -> Unit) {
                             imageVector = Icons.Default.Notifications,
                             contentDescription = null,
                             tint = SplashBackground,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clickable { onNotificationClick() }
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = null,
                             tint = SplashBackground,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clickable { onSettingsClick() }
                         )
                     }
                 }
@@ -202,55 +212,92 @@ fun HomeScreen(onDoctorClick: (String) -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Search, null, tint = SplashBackground, modifier = Modifier.size(24.dp))
-                        Text("Doctors", fontSize = 12.sp, color = SplashBackground, fontFamily = FontFamily.Default)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable {
+                            isFavoriteTabSelected = false
+                            onDoctorsTabClick()
+                        }
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            null,
+                            tint = if (!isFavoriteTabSelected) SplashBackground else TextSecondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Doctors",
+                            fontSize = 12.sp,
+                            color = if (!isFavoriteTabSelected) SplashBackground else TextSecondary,
+                            fontWeight = if (!isFavoriteTabSelected) FontWeight.Bold else FontWeight.Normal,
+                            fontFamily = FontFamily.Default
+                        )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Search, null, tint = TextSecondary, modifier = Modifier.size(24.dp))
-                        Text("Favorite", fontSize = 12.sp, color = TextSecondary, fontFamily = FontFamily.Default)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,modifier = Modifier.clickable { isFavoriteTabSelected = true }
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            null,
+                            tint = if (isFavoriteTabSelected) SplashBackground else TextSecondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Favorite",
+                            fontSize = 12.sp,
+                            color = if (isFavoriteTabSelected) SplashBackground else TextSecondary,
+                            fontWeight = if (isFavoriteTabSelected) FontWeight.Bold else FontWeight.Normal,
+                            fontFamily = FontFamily.Default
+                        )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
-                    Row(
+                    TextField(
+                        value = homeSearchQuery,
+                        onValueChange = { homeSearchQuery = it },
+                        placeholder = { Text("Search...", color = TextSecondary, fontSize = 14.sp) },
+                        leadingIcon = { Icon(Icons.Default.Tune, null, tint = TextSecondary) },
+                        trailingIcon = { Icon(Icons.Default.Search, null, tint = SplashBackground) },
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp)
-                            .background(MedSurface, RoundedCornerShape(22.dp))
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Icon(Icons.Default.Tune, null, tint = TextSecondary)
-                        Icon(Icons.Default.Search, null, tint = SplashBackground)
-                    }
+                            .height(46.dp),
+                        shape = RoundedCornerShape(23.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MedSurface,
+                            unfocusedContainerColor = MedSurface,
+                            disabledContainerColor = MedSurface,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
                 }
-
                 Spacer(modifier = Modifier.height(20.dp))
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(days) { item ->
+                    items(items = days) { dayItem: CalendarDay ->
                         Box(
                             modifier = Modifier
                                 .size(width = 54.dp, height = 76.dp)
                                 .clip(RoundedCornerShape(27.dp))
-                                .background(if (item.isSelected) SplashBackground else MedSurface),
+                                .background(if (dayItem.isSelected) SplashBackground else MedSurface),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = item.day,
+                                    text = dayItem.day,
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (item.isSelected) MedSurface else TextPrimary,
+                                    color = if (dayItem.isSelected) MedSurface else TextPrimary,
                                     fontFamily = FontFamily.Default
                                 )
                                 Text(
-                                    text = item.name,
+                                    text = dayItem.name,
                                     fontSize = 11.sp,
-                                    color = if (item.isSelected) MedSurface.copy(alpha = 0.7f) else TextSecondary,
+                                    color = if (dayItem.isSelected) MedSurface.copy(alpha = 0.7f) else TextSecondary,
                                     fontFamily = FontFamily.Default
                                 )
                             }
@@ -308,7 +355,7 @@ fun HomeScreen(onDoctorClick: (String) -> Unit) {
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(doctors) { doc ->
+                items(filteredDoctors) { doc ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -320,8 +367,8 @@ fun HomeScreen(onDoctorClick: (String) -> Unit) {
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Image(
-                                painter = painterResource(id = doc.avatarRes),
+                            AsyncImage(
+                                model = doc.avatarUrl,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier

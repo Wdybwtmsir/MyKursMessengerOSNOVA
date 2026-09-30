@@ -1,6 +1,5 @@
 package ru.khrom.mykursmessenger.presentation
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,18 +19,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import ru.khrom.mykursmessenger.R
-import ru.khrom.mykursmessenger.data.Doctor
+import ru.khrom.mykursmessenger.data.DoctorRepository
 import ru.khrom.mykursmessenger.data.Message
 import ru.khrom.mykursmessenger.ui.theme.*
+import java.util.Date
 
 @Composable
 fun ChatScreen(
@@ -41,199 +40,167 @@ fun ChatScreen(
     onVideoCallClick: () -> Unit
 ) {
     val db = FirebaseFirestore.getInstance()
-    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    val auth = FirebaseAuth.getInstance()
+    val currentUserId = auth.currentUser?.uid ?: ""
 
-    var messages by remember { mutableStateOf(listOf<Message>()) }
-    var textInput by remember { mutableStateOf("") }
-
-    val doctors = remember {
-        listOf(
-            Doctor("1", "Д-р Александр Иванов", "Дерматолог", "Здравствуйте! Как ваши успехи с лечением?", "10:30", true, R.drawable.doc_alex),
-            Doctor("2", "Д-р Мария Петрова", "Аллерголог", "Пришлите, пожалуйста, результаты анализов.", "Вчера", false, R.drawable.doc_maria),
-            Doctor("3", "Д-р Сергей Смирнов", "Терапевт", "Жду вас на повторный прием в пятницу.", "2 дня назад", true, R.drawable.doc_sergey),
-            Doctor("4", "Д-р Елена Козлова", "Педиатр", "Рецепт на лекарство я обновила.", "05.10", false, R.drawable.doc_elena)
-        )
+    val doctor = remember(doctorId) {
+        DoctorRepository.doctors.find { it.id == doctorId } ?: DoctorRepository.doctors.first()
     }
 
-    val doctor = doctors.find { it.id == doctorId } ?: doctors.first()
+    var messageText by remember { mutableStateOf("") }
+    var chatMessages by remember { mutableStateOf(listOf<Message>()) }
 
-    DisposableEffect(doctorId) {
-        val listener = db.collection("chats")
-            .document(doctorId)
+    val chatId = remember(currentUserId, doctorId) {
+        if (currentUserId < doctorId) "${currentUserId}_$doctorId" else "${doctorId}_$currentUserId"
+    }
+
+    LaunchedEffect(chatId) {
+        db.collection("chats")
+            .document(chatId)
             .collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
-                    messages = snapshot.toObjects(Message::class.java)
+                    chatMessages = snapshot.toObjects(Message::class.java)
                 }
             }
-        onDispose { listener.remove() }
     }
 
     Scaffold(
-        containerColor = MedBackground
+        containerColor = MedBackground,
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MedSurface)
+                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = null,
+                    tint = TextPrimary,
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .clickable { onBackClick() }
+                )
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                AsyncImage(
+                    model = doctor.avatarUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(doctor.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SplashBackground, fontFamily = FontFamily.Default)
+                    Text(if (doctor.isOnline) "В сети" else "Вне сети", fontSize = 12.sp, color = if (doctor.isOnline) Color(0xFF10B981) else TextSecondary)
+                }
+
+                IconButton(onClick = onCallClick) {
+                    Icon(Icons.Default.Call, null, tint = SplashBackground)
+                }
+                IconButton(onClick = onVideoCallClick) {
+                    Icon(Icons.Default.Videocam, null, tint = SplashBackground)
+                }
+            }
+        }
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MedSurface)
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = null,
-                        tint = TextPrimary,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .clickable { onBackClick() }
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    Image(
-                        painter = painterResource(id = doctor.avatarRes),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column {
-                        Text(
-                            text = doctor.name,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary,
-                            fontFamily = FontFamily.Default
-                        )
-                        Text(
-                            text = if (doctor.isOnline) "В сети" else "Был(а) недавно",
-                            fontSize = 12.sp,
-                            color = if (doctor.isOnline) Color(0xFF10B981) else TextSecondary,
-                            fontWeight = FontWeight.Medium,
-                            fontFamily = FontFamily.Default
-                        )
-                    }
-                }
-
-                Row {
-                    IconButton(onClick = { onCallClick() }) {
-                        Icon(
-                            imageVector = Icons.Default.Call,
-                            contentDescription = null,
-                            tint = MedPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = { onVideoCallClick() }) {
-                        Icon(
-                            imageVector = Icons.Default.Videocam,
-                            contentDescription = null,
-                            tint = MedPrimary,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-                }
-            }
-
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 12.dp)
             ) {
-                items(messages) { message ->
-                    val isMyMessage = message.senderId == currentUserId
-                    ChatBubble(message = message, isMyMessage = isMyMessage)
-                }
-            }
-
-            Surface(
-                tonalElevation = 4.dp,
-                color = MedSurface,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = textInput,
-                        onValueChange = { textInput = it },
-                        placeholder = { Text("Напишите сообщение...", color = TextSecondary) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = MedPrimary,
-                            unfocusedBorderColor = TextSecondary.copy(alpha = 0.2f)
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    IconButton(
-                        onClick = {
-                            if (textInput.isNotBlank()) {
-                                val newMessage = Message(senderId = currentUserId, text = textInput)
-                                db.collection("chats")
-                                    .document(doctorId)
-                                    .collection("messages")
-                                    .add(newMessage)
-                                textInput = ""
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = MedPrimary),
-                        modifier = Modifier.size(48.dp)
+                items(chatMessages) { msg ->
+                    val isMyMessage = msg.senderId == currentUserId
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = if (isMyMessage) Alignment.CenterEnd else Alignment.CenterStart
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = null,
-                            tint = MedSurface
-                        )
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isMyMessage) SplashBackground else MedSurface
+                            ),
+                            shape = RoundedCornerShape(
+                                topStart = 16.dp,
+                                topEnd = 16.dp,
+                                bottomStart = if (isMyMessage) 16.dp else 0.dp,
+                                bottomEnd = if (isMyMessage) 0.dp else 16.dp
+                            ),
+                            modifier = Modifier.widthIn(max = 280.dp)
+                        ) {
+                            Text(
+                                text = msg.text,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                color = if (isMyMessage) MedSurface else TextPrimary,
+                                fontSize = 15.sp,
+                                fontFamily = FontFamily.Default
+                            )
+                        }
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-fun ChatBubble(message: Message, isMyMessage: Boolean) {
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = if (isMyMessage) Alignment.CenterEnd else Alignment.CenterStart
-    ) {
-        Surface(
-            color = if (isMyMessage) BubbleOut else BubbleIn,
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isMyMessage) 16.dp else 2.dp,
-                bottomEnd = if (isMyMessage) 2.dp else 16.dp
-            )
-        ) {
-            Text(
-                text = message.text,
-                color = if (isMyMessage) MedSurface else TextPrimary,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                fontSize = 15.sp,
-                fontFamily = FontFamily.Default
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MedSurface)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    placeholder = { Text("Введите сообщение...", color = TextSecondary) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MedBackground,
+                        unfocusedContainerColor = MedBackground,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent
+                    )
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = {
+                        if (messageText.isNotBlank()) {
+                            // Передаем объект Date(System.currentTimeMillis()) для соответствия вашей модели данных
+                            val newMessage = Message(
+                                senderId = currentUserId,
+                                text = messageText.trim(),
+                                timestamp = Date(System.currentTimeMillis())
+                            )
+                            db.collection("chats")
+                                .document(chatId)
+                                .collection("messages")
+                                .add(newMessage)
+                            messageText = ""
+                        }
+                    },
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(SplashBackground, CircleShape)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, null, tint = MedSurface)
+                }
+            }
         }
     }
 }

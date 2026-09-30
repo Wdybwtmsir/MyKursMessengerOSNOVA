@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,42 +53,58 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     NavigationBarItem(
                                         selected = currentRoute == "home_screen",
-                                        onClick = { if (currentRoute != "home_screen") navController.navigate("home_screen") },
+                                        onClick = {
+                                            if (currentRoute != "home_screen") {
+                                                navController.navigate("home_screen") {
+                                                    popUpTo("home_screen") { inclusive = true }
+                                                }
+                                            }
+                                        },
                                         icon = { Icon(Icons.Default.Home, null, modifier = Modifier.size(26.dp)) },
                                         colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = SplashBackground,
-                                            unselectedIconColor = MedSurface,
-                                            indicatorColor = MedSurface
+                                            selectedIconColor = SplashBackground, unselectedIconColor = MedSurface, indicatorColor = MedSurface
                                         )
                                     )
                                     NavigationBarItem(
                                         selected = currentRoute == "doctor_list",
-                                        onClick = { if (currentRoute != "doctor_list") navController.navigate("doctor_list") },
+                                        onClick = {
+                                            if (currentRoute != "doctor_list") {
+                                                navController.navigate("doctor_list") {
+                                                    popUpTo("home_screen") { inclusive = false }
+                                                }
+                                            }
+                                        },
                                         icon = { Icon(Icons.Default.Chat, null, modifier = Modifier.size(24.dp)) },
                                         colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = SplashBackground,
-                                            unselectedIconColor = MedSurface,
-                                            indicatorColor = MedSurface
+                                            selectedIconColor = SplashBackground, unselectedIconColor = MedSurface, indicatorColor = MedSurface
                                         )
                                     )
                                     NavigationBarItem(
                                         selected = currentRoute == "profile",
-                                        onClick = { if (currentRoute != "profile") navController.navigate("profile") },
+                                        onClick = {
+                                            if (currentRoute != "profile") {
+                                                navController.navigate("profile") {
+                                                    popUpTo("home_screen") { inclusive = false }
+                                                }
+                                            }
+                                        },
                                         icon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(26.dp)) },
                                         colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = SplashBackground,
-                                            unselectedIconColor = MedSurface,
-                                            indicatorColor = MedSurface
+                                            selectedIconColor = SplashBackground, unselectedIconColor = MedSurface, indicatorColor = MedSurface
                                         )
                                     )
                                     NavigationBarItem(
                                         selected = currentRoute == "appointments_screen",
-                                        onClick = { if (currentRoute != "appointments_screen") navController.navigate("appointments_screen") },
+                                        onClick = {
+                                            if (currentRoute != "appointments_screen") {
+                                                navController.navigate("appointments_screen") {
+                                                    popUpTo("home_screen") { inclusive = false }
+                                                }
+                                            }
+                                        },
                                         icon = { Icon(Icons.Default.CalendarMonth, null, modifier = Modifier.size(24.dp)) },
                                         colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = SplashBackground,
-                                            unselectedIconColor = MedSurface,
-                                            indicatorColor = MedSurface
+                                            selectedIconColor = SplashBackground, unselectedIconColor = MedSurface, indicatorColor = MedSurface
                                         )
                                     )
                                 }
@@ -100,42 +118,27 @@ class MainActivity : ComponentActivity() {
                         ) {
                             composable("splash") {
                                 SplashScreen(onNavigateNext = { route ->
-                                    navController.navigate(route) {
-                                        popUpTo("splash") { inclusive = true }
-                                    }
+                                    navController.navigate(route) { popUpTo("splash") { inclusive = true } }
                                 })
                             }
 
                             composable("welcome") {
-                                WelcomeScreen(onGetStartedClick = {
-                                    navController.navigate("login")
-                                })
+                                WelcomeScreen(onGetStartedClick = { navController.navigate("login") })
                             }
 
                             composable("login") {
                                 LoginScreen(
                                     onAuthSuccess = {
-                                        Toast.makeText(this@MainActivity, "Вход успешен!", Toast.LENGTH_SHORT).show()
-                                        navController.navigate("home_screen") {
-                                            popUpTo("welcome") { inclusive = true }
-                                        }
+                                        navController.navigate("home_screen") { popUpTo("welcome") { inclusive = true } }
                                     },
-                                    onSignUpClick = {
-                                        navController.navigate("signup")
-                                    }
+                                    onSignUpClick = { navController.navigate("signup") }
                                 )
                             }
 
                             composable("signup") {
                                 SignUpScreen(
-                                    onNextClick = { email ->
-                                        navController.navigate("set_password/$email")
-                                    },
-                                    onBackToLoginClick = {
-                                        navController.navigate("login") {
-                                            popUpTo("login") { inclusive = true }
-                                        }
-                                    }
+                                    onNextClick = { email -> navController.navigate("set_password/$email") },
+                                    onBackToLoginClick = { navController.navigate("login") { popUpTo("login") { inclusive = true } } }
                                 )
                             }
 
@@ -146,29 +149,23 @@ class MainActivity : ComponentActivity() {
                                 val email = backStackEntry.arguments?.getString("email") ?: ""
                                 SetPasswordScreen(
                                     email = email,
-                                    onRegisterSuccess = {
-                                        Toast.makeText(this@MainActivity, "Регистрация успешна!", Toast.LENGTH_SHORT).show()
-                                        navController.navigate("login") {
-                                            popUpTo("welcome") { inclusive = true }
-                                        }
-                                    }
+                                    onRegisterSuccess = { navController.navigate("login") { popUpTo("welcome") { inclusive = true } } }
                                 )
                             }
 
                             composable("home_screen") {
-                                HomeScreen(onDoctorClick = { doctorId ->
-                                    navController.navigate("doctor_details/$doctorId")
-                                })
+                                HomeScreen(
+                                    onDoctorClick = { doctorId -> navController.navigate("doctor_details/$doctorId") },
+                                    onNotificationClick = { navController.navigate("notification_screen") },
+                                    onSettingsClick = { navController.navigate("settings_screen") },
+                                    onDoctorsTabClick = { navController.navigate("doctor_list") }
+                                )
                             }
 
                             composable("doctor_list") {
                                 DoctorListScreen(
-                                    onDoctorClick = { doctorId ->
-                                        navController.navigate("doctor_details/$doctorId")
-                                    },
-                                    onProfileClick = {
-                                        navController.navigate("profile")
-                                    }
+                                    onDoctorClick = { doctorId -> navController.navigate("doctor_details/$doctorId") },
+                                    onProfileClick = { navController.navigate("profile") }
                                 )
                             }
 
@@ -179,12 +176,8 @@ class MainActivity : ComponentActivity() {
                                 val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
                                 DoctorDetailsScreen(
                                     doctorId = doctorId,
-                                    onBackClick = {
-                                        navController.popBackStack()
-                                    },
-                                    onStartChatClick = {
-                                        navController.navigate("schedule_screen/$doctorId")
-                                    }
+                                    onBackClick = { navController.popBackStack() },
+                                    onStartChatClick = { navController.navigate("schedule_screen/$doctorId") }
                                 )
                             }
                             composable(
@@ -194,13 +187,74 @@ class MainActivity : ComponentActivity() {
                                 val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
                                 ScheduleScreen(
                                     doctorId = doctorId,
-                                    onBackClick = {
-                                        navController.popBackStack()
-                                    },
-                                    onBookClick = {
-                                        navController.navigate("chat_screen/$doctorId") {
-                                            popUpTo("home_screen") { inclusive = false }
-                                        }
+                                    onBackClick = { navController.popBackStack() },
+                                    onBookClick = { date, slot, forWhom, problem ->
+                                        navController.navigate("appointment_details_screen/$doctorId/$date/$slot/$forWhom/$problem")
+                                    }
+                                )
+                            }
+                            composable(
+                                route = "appointment_details_screen/{doctorId}/{date}/{slot}/{forWhom}/{problem}",
+                                arguments = listOf(
+                                    navArgument("doctorId") { type = NavType.StringType },
+                                    navArgument("date") { type = NavType.StringType },
+                                    navArgument("slot") { type = NavType.StringType },
+                                    navArgument("forWhom") { type = NavType.StringType },
+                                    navArgument("problem") { type = NavType.StringType }
+                                )
+                            ) { backStackEntry ->
+                                val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
+                                val date = backStackEntry.arguments?.getString("date") ?: ""
+                                val slot = backStackEntry.arguments?.getString("slot") ?: ""
+                                val forWhom = backStackEntry.arguments?.getString("forWhom") ?: ""
+                                val problem = backStackEntry.arguments?.getString("problem") ?: ""
+                                AppointmentDetailsScreen(
+                                    doctorId = doctorId, dateText = date, timeSlot = slot, bookingFor = forWhom, problemDescription = problem,
+                                    onBackClick = { navController.popBackStack() },
+                                    onConfirmClick = { navController.navigate("review_summary_screen/$doctorId/$date/$slot/$forWhom/$problem") }
+                                )
+                            }
+                            composable(
+                                route = "review_summary_screen/{doctorId}/{date}/{slot}/{forWhom}/{problem}",
+                                arguments = listOf(
+                                    navArgument("doctorId") { type = NavType.StringType },
+                                    navArgument("date") { type = NavType.StringType },
+                                    navArgument("slot") { type = NavType.StringType },
+                                    navArgument("forWhom") { type = NavType.StringType },
+                                    navArgument("problem") { type = NavType.StringType }
+                                )
+                            ) { backStackEntry ->
+                                val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
+                                val date = backStackEntry.arguments?.getString("date") ?: ""
+                                val slot = backStackEntry.arguments?.getString("slot") ?: ""
+                                val forWhom = backStackEntry.arguments?.getString("forWhom") ?: ""
+                                val problem = backStackEntry.arguments?.getString("problem") ?: ""
+                                ReviewSummaryScreen(
+                                    doctorId = doctorId, dateText = date, timeSlot = slot, bookingFor = forWhom,
+                                    onBackClick = { navController.popBackStack() },
+                                    onPayNowClick = { navController.navigate("payment_screen/$doctorId/$date/$slot/$forWhom/$problem") }
+                                )
+                            }
+                            composable(
+                                route = "payment_screen/{doctorId}/{date}/{slot}/{forWhom}/{problem}",
+                                arguments = listOf(
+                                    navArgument("doctorId") { type = NavType.StringType },
+                                    navArgument("date") { type = NavType.StringType },
+                                    navArgument("slot") { type = NavType.StringType },
+                                    navArgument("forWhom") { type = NavType.StringType },
+                                    navArgument("problem") { type = NavType.StringType }
+                                )
+                            ) { backStackEntry ->
+                                val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
+                                val date = backStackEntry.arguments?.getString("date") ?: ""
+                                val slot = backStackEntry.arguments?.getString("slot") ?: ""
+                                val forWhom = backStackEntry.arguments?.getString("forWhom") ?: ""
+                                val problem = backStackEntry.arguments?.getString("problem") ?: ""
+                                PaymentScreen(
+                                    doctorId = doctorId, dateText = date, timeSlot = slot, bookingFor = forWhom, problemDescription = problem,
+                                    onBackClick = { navController.popBackStack() },
+                                    onPaymentComplete = {
+                                        navController.navigate("chat_screen/$doctorId") { popUpTo("home_screen") { inclusive = false } }
                                     }
                                 )
                             }
@@ -210,95 +264,48 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
                                 ChatScreen(
-                                    doctorId = doctorId,
-                                    onBackClick = {
-                                        navController.popBackStack()
-                                    },
-                                    onCallClick = {
-                                        navController.navigate("call_screen/$doctorId")
-                                    },
-                                    onVideoCallClick = {
-                                        navController.navigate("video_call_screen/$doctorId")
-                                    }
+                                    doctorId = doctorId, onBackClick = { navController.popBackStack() },
+                                    onCallClick = { navController.navigate("call_screen/$doctorId") },
+                                    onVideoCallClick = { navController.navigate("video_call_screen/$doctorId") }
                                 )
                             }
                             composable("profile") {
                                 ProfileScreen(
-                                    onBackClick = {
-                                        navController.popBackStack()
-                                    },
-                                    onEditProfileClick = {
-                                        navController.navigate("edit_profile")
-                                    },
-                                    onLogoutSuccess = {
-                                        navController.navigate("welcome") {
-                                            popUpTo(0) { inclusive = true }
-                                        }
-                                    }
+                                    onBackClick = { navController.popBackStack() },
+                                    onEditProfileClick = { navController.navigate("edit_profile") }, // Роут совпадает
+                                    onLogoutSuccess = { navController.navigate("welcome") { popUpTo(0) { inclusive = true } } }
                                 )
                             }
-                            composable(
-                                route = "call_screen/{doctorId}",
-                                arguments = listOf(navArgument("doctorId") { type = NavType.StringType })
-                            ) { backStackEntry ->
-                                val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
-                                CallScreen(
-                                    doctorId = doctorId,
-                                    onDisconnectClick = {
-                                        navController.navigate("review_screen/$doctorId") {
-                                            popUpTo("chat_screen/$doctorId") { inclusive = false }
-                                        }
-                                    }
-                                )
-                            }
-                            composable(
-                                route = "video_call_screen/{doctorId}",
-                                arguments = listOf(navArgument("doctorId") { type = NavType.StringType })
-                            ) { backStackEntry ->
-                                val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
-                                VideoCallScreen(
-                                    doctorId = doctorId,
-                                    onDisconnectClick = {
-                                        navController.navigate("review_screen/$doctorId") {
-                                            popUpTo("chat_screen/$doctorId") { inclusive = false }
-                                        }
-                                    }
-                                )
-                            }
+// Проверили и жестко зафиксировали имя роута "edit_profile"
                             composable("edit_profile") {
                                 EditProfileScreen(
-                                    onBackClick = {
-                                        navController.popBackStack()
-                                    },
+                                    onBackClick = { navController.popBackStack() },
                                     onSaveClick = {
-                                        Toast.makeText(this@MainActivity, "Профиль обновлен!", Toast.LENGTH_SHORT).show()
-                                        navController.popBackStack()
-                                    }
-                                )
-                            }
-                            composable(
-                                route = "review_screen/{doctorId}",
-                                arguments = listOf(navArgument("doctorId") { type = NavType.StringType })
-                            ) { backStackEntry ->
-                                val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
-                                DoctorReviewScreen(
-                                    doctorId = doctorId,
-                                    onBackClick = {
-                                        navController.popBackStack()
-                                    },
-                                    onSubmitClick = {
-                                        Toast.makeText(this@MainActivity, "Спасибо за ваш отзыв!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this@MainActivity, "Профиль успешно обновлен!", Toast.LENGTH_SHORT).show()
                                         navController.popBackStack()
                                     }
                                 )
                             }
                             composable("appointments_screen") {
-                                AppointmentsScreen(
-                                    onReviewClick = { doctorId ->
-                                        navController.navigate("review_screen/$doctorId")
-                                    }
+                                AppointmentsScreen(onReviewClick = { doctorId -> navController.navigate("review_screen/$doctorId") })
+                            }
+                            composable("notification_screen") { NotificationScreen(onBackClick = { navController.popBackStack() }) }
+                            composable("notification_setting_screen") { NotificationSettingsScreen(onBackClick = { navController.popBackStack() }) }
+                            composable("settings_screen") {
+                                SettingsScreen(
+                                    onBackClick = { navController.popBackStack() },
+                                    onNotificationSettingClick = { navController.navigate("notification_setting_screen") },
+                                    onPasswordManagerClick = { navController.navigate("password_manager_screen") },
+                                    onPrivacyPolicyClick = { navController.navigate("privacy_policy_screen") },
+                                    onHelpCenterClick = { navController.navigate("help_center_screen") },
+                                    onAccountDeletedSuccess = { navController.navigate("welcome") { popUpTo(0) { inclusive = true } } }
                                 )
                             }
+                            composable("password_manager_screen") {
+                                PasswordManagerScreen(onBackClick = { navController.popBackStack() }, onChangePasswordSuccess = { navController.popBackStack() })
+                            }
+                            composable("help_center_screen") { HelpCenterScreen(onBackClick = { navController.popBackStack() }) }
+                            composable("privacy_policy_screen") { PrivacyPolicyScreen(onBackClick = { navController.popBackStack() }) }
                         }
                     }
                 }

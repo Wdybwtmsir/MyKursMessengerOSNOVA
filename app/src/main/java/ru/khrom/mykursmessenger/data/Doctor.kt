@@ -7,5 +7,7 @@ data class Doctor(
     val lastMessage: String = "",
     val time: String = "",
     val isOnline: Boolean = false,
-    val avatarRes: Int = 0
+    val avatarUrl: String = "", // Строковая URL ссылка вместо R.drawable
+    val gender: String = "",
+    val isFavorite: Boolean = false
 )

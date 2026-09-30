@@ -1,6 +1,5 @@
 package ru.khrom.mykursmessenger.presentation
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,30 +18,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ru.khrom.mykursmessenger.R
+import coil.compose.AsyncImage
 import ru.khrom.mykursmessenger.data.Doctor
+import ru.khrom.mykursmessenger.data.DoctorRepository
 import ru.khrom.mykursmessenger.ui.theme.*
 
 @Composable
 fun DoctorListScreen(onDoctorClick: (String) -> Unit, onProfileClick: () -> Unit) {
     var searchQuery by remember { mutableStateOf("") }
+    var selectedGenderFilter by remember { mutableStateOf("All") }
+    val filters = listOf("All", "Male", "Female")
 
-    val doctors = remember {
-        listOf(
-            Doctor("1", "Д-р Александр Иванов", "Дерматолог", "Здравствуйте! Как ваши успехи с лечением?", "10:30", true, R.drawable.doc_alex),
-            Doctor("2", "Д-р Мария Петрова", "Аллерголог", "Пришлите, пожалуйста, результаты анализов.", "Вчера", false, R.drawable.doc_maria),
-            Doctor("3", "Д-р Сергей Смирнов", "Терапевт", "Жду вас на повторный прием в пятницу.", "2 дня назад", true, R.drawable.doc_sergey),
-            Doctor("4", "Д-р Елена Козлова", "Педиатр", "Рецепт на лекарство я обновила.", "05.10", false, R.drawable.doc_elena)
-        )
-    }
+    // Чистый вызов глобального репозитория сетевых ссылок
+    val doctors = remember { DoctorRepository.doctors }
 
-    val filteredDoctors = doctors.filter {
-        it.name.contains(searchQuery, ignoreCase = true) || it.specialty.contains(searchQuery, ignoreCase = true)
+    val filteredDoctors = doctors.filter { doctor ->
+        val matchesSearch = doctor.name.contains(searchQuery, ignoreCase = true) || doctor.specialty.contains(searchQuery, ignoreCase = true)
+        val matchesGender = selectedGenderFilter == "All" || doctor.gender.equals(selectedGenderFilter, ignoreCase = true)
+        matchesSearch && matchesGender
     }
 
     Scaffold(
@@ -61,7 +59,7 @@ fun DoctorListScreen(onDoctorClick: (String) -> Unit, onProfileClick: () -> Unit
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Сообщения",
+                    text = "Doctors",
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
@@ -95,12 +93,42 @@ fun DoctorListScreen(onDoctorClick: (String) -> Unit, onProfileClick: () -> Unit
                 )
             )
 
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                filters.forEach { filterTitle ->
+                    val isSelected = selectedGenderFilter == filterTitle
+                    Button(
+                        onClick = { selectedGenderFilter = filterTitle },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelected) SplashBackground else Color(0xFFD6E4FF).copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(19.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = filterTitle,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (isSelected) MedSurface else SplashBackground,
+                            fontFamily = FontFamily.Default
+                        )
+                    }
+                }
+            }
+
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
                 items(filteredDoctors) { doctor ->
-                    DoctorItem(doctor = doctor, onClick = { onDoctorClick(doctor.id) })
+                    DoctorCardItem(doctor = doctor, onClick = { onDoctorClick(doctor.id) })
                 }
             }
         }
@@ -108,7 +136,7 @@ fun DoctorListScreen(onDoctorClick: (String) -> Unit, onProfileClick: () -> Unit
 }
 
 @Composable
-fun DoctorItem(doctor: Doctor, onClick: () -> Unit) {
+fun DoctorCardItem(doctor: Doctor, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -119,16 +147,16 @@ fun DoctorItem(doctor: Doctor, onClick: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box {
-                Image(
-                    painter = painterResource(id = doctor.avatarRes),
+                AsyncImage(
+                    model = doctor.avatarUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(60.dp)
                         .clip(CircleShape)
                 )
 
@@ -159,19 +187,22 @@ fun DoctorItem(doctor: Doctor, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = doctor.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary, fontFamily = FontFamily.Default)
-                    Text(text = doctor.time, fontSize = 12.sp, color = TextSecondary, fontFamily = FontFamily.Default)
+                    Text(text = doctor.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SplashBackground, fontFamily = FontFamily.Default)
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFB800),
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(text = doctor.specialty, fontSize = 13.sp, color = MedPrimary, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Default)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = doctor.lastMessage,
-                    fontSize = 14.sp,
-                    color = TextSecondary,
-                    maxLines = 1,
-                    fontFamily = FontFamily.Default
-                )
+                Text(text = doctor.specialty, fontSize = 13.sp, color = TextSecondary, fontFamily = FontFamily.Default)
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("4.9", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Q 60", fontSize = 12.sp, color = TextSecondary)
+                }
             }
         }
     }
