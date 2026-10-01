@@ -1,5 +1,5 @@
 plugins {
-    // Подключаем плагины напрямую строками БЕЗ использования libs
+    // Жестко подключаем плагины строками напрямую БЕЗ каталога libs
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
@@ -42,7 +42,7 @@ android {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
     packaging {
         resources {
@@ -52,34 +52,31 @@ android {
 }
 
 dependencies {
-    // Подключаем основные библиотеки напрямую строками, чтобы обойти сбой каталога версий
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.activity:activity-compose:1.8.0")
-
-    // Платформа Compose BOM и её элементы
-    val composeBom = platform("androidx.compose:compose-bom:2023.08.00")
+    val composeBom = platform("androidx.compose:compose-bom:2024.02.02")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
 
-    // Firebase облако
-    implementation("com.google.firebase:firebase-auth-ktx:22.1.2")
-    implementation("com.google.firebase:firebase-firestore-ktx:24.7.1")
-    implementation("com.google.firebase:firebase-storage-ktx:20.2.1")
+    // Стабильный набор Firebase (С фиксированными версиями без конфликтов слияния манифестов)
+    implementation("com.google.firebase:firebase-auth-ktx:22.3.0")
+    implementation("com.google.firebase:firebase-firestore-ktx:24.10.0")
+    implementation("com.google.firebase:firebase-storage-ktx:20.3.0")
 
-    // Навигация, иконки и Coil для аватарок из галереи
-    implementation("androidx.navigation:navigation-compose:2.7.4")
-    implementation("androidx.compose.material:material-icons-extended:1.5.3")
-    implementation("io.coil-kt:coil-compose:2.4.0")
+    // Навигация между экранами, расширенные иконки и Coil для фото из галереи
+    implementation("androidx.navigation:navigation-compose:2.7.5")
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
-    // КОРУТИНЫ ДЛЯ СТАБИЛЬНЫХ ЗВОНКОВ И ЗАСТАВКИ НА ВАШИХ ТЕЛЕФОНАХ:
+    // КОРУТИНЫ ДЛЯ НАСТОЯЩИХ ЗВОНКОВ И ЗАСТАВКИ НА ТЕЛЕФОНАХ:
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // Тестирование
+    // Библиотеки тестирования
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")

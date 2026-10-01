@@ -1,24 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://android.com"
-    package="ru.khrom.mykursmessenger">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-
+    <!-- Разрешения для реальных устройств связи -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-    <!-- Декларация использования железа -->
+    <!-- Декларация использования аппаратного железа смартфона -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.MyKursMessenger">
+        android:label="Skin First"
+        android:supportsRtl="true">
 
         <activity
             android:name=".MainActivity"
