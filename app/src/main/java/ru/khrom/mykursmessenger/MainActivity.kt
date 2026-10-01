@@ -4,8 +4,6 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,6 +22,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import ru.khrom.mykursmessenger.presentation.*
 import ru.khrom.mykursmessenger.ui.theme.MedSurface
 import ru.khrom.mykursmessenger.ui.theme.MyKursMessengerTheme
@@ -34,16 +34,51 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MyKursMessengerTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val navController = rememberNavController()
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = navBackStackEntry?.destination?.route
 
-                    // Показываем BottomBar только для пациента на его экранах
-                    val showBottomBar = currentRoute in listOf("home_screen", "doctor_list", "profile", "appointments_screen")
+                    val auth = FirebaseAuth.getInstance()
+                    val db = FirebaseFirestore.getInstance()
+                    val currentUserId = auth.currentUser?.uid ?: ""
+
+                    var currentUserRole by remember { mutableStateOf("patient") }
+
+                    val startScreen = remember {
+                        if (auth.currentUser != null) "splash" else "welcome"
+                    }
+
+                    DisposableEffect(currentUserId) {
+                        if (currentUserId.isNotEmpty()) {
+                            db.collection("users").document(currentUserId).get().addOnSuccessListener { s ->
+                                currentUserRole = s.getString("role") ?: "patient"
+                            }
+
+                            val listener = db.collection("users").document(currentUserId)
+                                .addSnapshotListener { snapshot, _ ->
+                                    if (snapshot != null && snapshot.exists()) {
+                                        val incomingCallId = snapshot.getString("activeCallId") ?: ""
+                                        if (incomingCallId.isNotEmpty() && currentRoute != "call_screen/$incomingCallId" && currentRoute != "video_call_screen/$incomingCallId") {
+                                            db.collection("calls").document(incomingCallId).get()
+                                                .addOnSuccessListener { callSnap ->
+                                                    val type = callSnap.getString("type") ?: "voice"
+                                                    if (type == "video") {
+                                                        navController.navigate("video_call_screen/$incomingCallId")
+                                                    } else {
+                                                        navController.navigate("call_screen/$incomingCallId")
+                                                    }
+                                                }
+                                        }
+                                    }
+                                }
+                            return@DisposableEffect onDispose { listener.remove() }
+                        }
+                        onDispose {}
+                    }
+
+                    // BottomBar показывается ИСКЛЮЧИТЕЛЬНО пациенту
+                    val showBottomBar = currentUserRole == "patient" && currentRoute in listOf("home_screen", "doctor_list", "profile", "appointments_screen")
 
                     Scaffold(
                         bottomBar = {
@@ -77,40 +112,43 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     ) { innerPadding ->
-                        NavHost(navController = navController, startDestination = "splash", modifier = Modifier.padding(innerPadding)) {
+                        NavHost(navController = navController, startDestination = startScreen, modifier = Modifier.padding(innerPadding)) {
                             composable("splash") {
-                                SplashScreen(onNavigateNext = { route -> navController.navigate(route) { popUpTo("splash") { inclusive = true } } })
+                                SplashScreen(onNavigateNext = {
+                                    if (auth.currentUser != null) {
+                                        db.collection("users").document(auth.currentUser!!.uid).get()
+                                            .addOnSuccessListener { snap ->
+                                                val role = snap.getString("role") ?: "patient"
+                                                currentUserRole = role
+                                                if (role == "doctor") navController.navigate("doctor_dashboard") { popUpTo("splash") { inclusive = true } }
+                                                else navController.navigate("home_screen") { popUpTo("splash") { inclusive = true } }
+                                            }
+                                    } else {
+                                        navController.navigate("welcome") { popUpTo("splash") { inclusive = true } }
+                                    }
+                                })
                             }
                             composable("welcome") { WelcomeScreen(onGetStartedClick = { navController.navigate("login") }) }
-
                             composable("login") {
                                 LoginScreen(
                                     onAuthSuccess = { role ->
-                                        if (role == "doctor") {
-                                            navController.navigate("doctor_dashboard") { popUpTo("welcome") { inclusive = true } }
-                                        } else {
-                                            navController.navigate("home_screen") { popUpTo("welcome") { inclusive = true } }
-                                        }
+                                        currentUserRole = role
+                                        if (role == "doctor") navController.navigate("doctor_dashboard") { popUpTo("welcome") { inclusive = true } }
+                                        else navController.navigate("home_screen") { popUpTo("welcome") { inclusive = true } }
                                     },
                                     onSignUpClick = { navController.navigate("signup") }
                                 )
                             }
-
                             composable("signup") {
                                 SignUpScreen(
                                     onNextClick = { email -> navController.navigate("set_password/$email") },
                                     onBackToLoginClick = { navController.navigate("login") { popUpTo("login") { inclusive = true } } }
                                 )
                             }
-
-                            composable(
-                                route = "set_password/{email}",
-                                arguments = listOf(navArgument("email") { type = NavType.StringType })
-                            ) { backStackEntry ->
+                            composable(route = "set_password/{email}", arguments = listOf(navArgument("email") { type = NavType.StringType })) { backStackEntry ->
                                 val email = backStackEntry.arguments?.getString("email") ?: ""
                                 SetPasswordScreen(email = email, onRegisterSuccess = { navController.navigate("login") { popUpTo("welcome") { inclusive = true } } })
                             }
-
                             composable("home_screen") {
                                 HomeScreen(
                                     onDoctorClick = { doctorId -> navController.navigate("doctor_details/$doctorId") },
@@ -119,41 +157,30 @@ class MainActivity : ComponentActivity() {
                                     onDoctorsTabClick = { navController.navigate("doctor_list") }
                                 )
                             }
-
-                            // ЭКРАН ВРАЧА
+// Панель врача получила кнопку настроек личного профиля
                             composable("doctor_dashboard") {
                                 DoctorDashboardScreen(
                                     onPatientChatClick = { patientId -> navController.navigate("chat_screen/$patientId") },
+                                    onProfileClick = { navController.navigate("profile") },
                                     onLogoutClick = { navController.navigate("welcome") { popUpTo(0) { inclusive = true } } }
                                 )
                             }
-
                             composable("doctor_list") {
                                 DoctorListScreen(
                                     onDoctorClick = { doctorId -> navController.navigate("doctor_details/$doctorId") },
+                                    onChatClick = { doctorId -> navController.navigate("chat_screen/$doctorId") },
                                     onProfileClick = { navController.navigate("profile") }
                                 )
                             }
-
-                            composable(
-                                route = "doctor_details/{doctorId}",
-                                arguments = listOf(navArgument("doctorId") { type = NavType.StringType })
-                            ) { backStackEntry ->
+                            composable(route = "doctor_details/{doctorId}", arguments = listOf(navArgument("doctorId") { type = NavType.StringType })) { backStackEntry ->
                                 val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
                                 DoctorDetailsScreen(doctorId = doctorId, onBackClick = { navController.popBackStack() }, onStartChatClick = { navController.navigate("schedule_screen/$doctorId") })
                             }
-
-                            composable(
-                                route = "schedule_screen/{doctorId}",
-                                arguments = listOf(navArgument("doctorId") { type = NavType.StringType })
-                            ) { backStackEntry ->
+                            composable(route = "schedule_screen/{doctorId}", arguments = listOf(navArgument("doctorId") { type = NavType.StringType })) { backStackEntry ->
                                 val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
                                 ScheduleScreen(doctorId = doctorId, onBackClick = { navController.popBackStack() }, onBookClick = { date, slot, forWhom, problem -> navController.navigate("appointment_details_screen/$doctorId/$date/$slot/$forWhom/$problem") })
                             }
-                            composable(
-                                route = "appointment_details_screen/{doctorId}/{date}/{slot}/{forWhom}/{problem}",
-                                arguments = listOf(navArgument("doctorId") { type = NavType.StringType }, navArgument("date") { type = NavType.StringType }, navArgument("slot") { type = NavType.StringType }, navArgument("forWhom") { type = NavType.StringType }, navArgument("problem") { type = NavType.StringType })
-                            ) { backStackEntry ->
+                            composable(route = "appointment_details_screen/{doctorId}/{date}/{slot}/{forWhom}/{problem}", arguments = listOf(navArgument("doctorId") { type = NavType.StringType }, navArgument("date") { type = NavType.StringType }, navArgument("slot") { type = NavType.StringType }, navArgument("forWhom") { type = NavType.StringType }, navArgument("problem") { type = NavType.StringType })) { backStackEntry ->
                                 val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
                                 val date = backStackEntry.arguments?.getString("date") ?: ""
                                 val slot = backStackEntry.arguments?.getString("slot") ?: ""
@@ -161,10 +188,7 @@ class MainActivity : ComponentActivity() {
                                 val problem = backStackEntry.arguments?.getString("problem") ?: ""
                                 AppointmentDetailsScreen(doctorId = doctorId, dateText = date, timeSlot = slot, bookingFor = forWhom, problemDescription = problem, onBackClick = { navController.popBackStack() }, onConfirmClick = { navController.navigate("review_summary_screen/$doctorId/$date/$slot/$forWhom/$problem") })
                             }
-                            composable(
-                                route = "review_summary_screen/{doctorId}/{date}/{slot}/{forWhom}/{problem}",
-                                arguments = listOf(navArgument("doctorId") { type = NavType.StringType }, navArgument("date") { type = NavType.StringType }, navArgument("slot") { type = NavType.StringType }, navArgument("forWhom") { type = NavType.StringType }, navArgument("problem") { type = NavType.StringType })
-                            ) { backStackEntry ->
+                            composable(route = "review_summary_screen/{doctorId}/{date}/{slot}/{forWhom}/{problem}", arguments = listOf(navArgument("doctorId") { type = NavType.StringType }, navArgument("date") { type = NavType.StringType }, navArgument("slot") { type = NavType.StringType }, navArgument("forWhom") { type = NavType.StringType }, navArgument("problem") { type = NavType.StringType })) { backStackEntry ->
                                 val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
                                 val date = backStackEntry.arguments?.getString("date") ?: ""
                                 val slot = backStackEntry.arguments?.getString("slot") ?: ""
@@ -172,10 +196,7 @@ class MainActivity : ComponentActivity() {
                                 val problem = backStackEntry.arguments?.getString("problem") ?: ""
                                 ReviewSummaryScreen(doctorId = doctorId, dateText = date, timeSlot = slot, bookingFor = forWhom, onBackClick = { navController.popBackStack() }, onPayNowClick = { navController.navigate("payment_screen/$doctorId/$date/$slot/$forWhom/$problem") })
                             }
-                            composable(
-                                route = "payment_screen/{doctorId}/{date}/{slot}/{forWhom}/{problem}",
-                                arguments = listOf(navArgument("doctorId") { type = NavType.StringType }, navArgument("date") { type = NavType.StringType }, navArgument("slot") { type = NavType.StringType }, navArgument("forWhom") { type = NavType.StringType }, navArgument("problem") { type = NavType.StringType })
-                            ) { backStackEntry ->
+                            composable(route = "payment_screen/{doctorId}/{date}/{slot}/{forWhom}/{problem}", arguments = listOf(navArgument("doctorId") { type = NavType.StringType }, navArgument("date") { type = NavType.StringType }, navArgument("slot") { type = NavType.StringType }, navArgument("forWhom") { type = NavType.StringType }, navArgument("problem") { type = NavType.StringType }) ) { backStackEntry ->
                                 val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
                                 val date = backStackEntry.arguments?.getString("date") ?: ""
                                 val slot = backStackEntry.arguments?.getString("slot") ?: ""
@@ -183,27 +204,24 @@ class MainActivity : ComponentActivity() {
                                 val problem = backStackEntry.arguments?.getString("problem") ?: ""
                                 PaymentScreen(doctorId = doctorId, dateText = date, timeSlot = slot, bookingFor = forWhom, problemDescription = problem, onBackClick = { navController.popBackStack() }, onPaymentComplete = { navController.navigate("chat_screen/$doctorId") { popUpTo("home_screen") { inclusive = false } } })
                             }
-                            composable(
-                                route = "chat_screen/{doctorId}",
-                                arguments = listOf(navArgument("doctorId") { type = NavType.StringType })
-                            ) { backStackEntry ->
+                            composable(route = "chat_screen/{doctorId}", arguments = listOf(navArgument("doctorId") { type = NavType.StringType })) { backStackEntry ->
                                 val doctorId = backStackEntry.arguments?.getString("doctorId") ?: ""
-                                ChatScreen(doctorId = doctorId, onBackClick = { navController.popBackStack() }, onCallClick = { navController.navigate("call_screen/$doctorId") }, onVideoCallClick = { navController.navigate("video_call_screen/$doctorId") })
+                                ChatScreen(doctorId = doctorId, onBackClick = { navController.popBackStack() })
                             }
-                            composable("profile") {
-                                ProfileScreen(onBackClick = { navController.popBackStack() }, onEditProfileClick = { navController.navigate("edit_profile") }, onLogoutSuccess = { navController.navigate("welcome") { popUpTo(0) { inclusive = true } } })
+                            composable(route = "call_screen/{callId}", arguments = listOf(navArgument("callId") { type = NavType.StringType })) { backStackEntry ->
+                                val callId = backStackEntry.arguments?.getString("callId") ?: ""
+                                CallScreen(callId = callId, onDisconnectClick = { navController.popBackStack() })
                             }
-                            composable("edit_profile") {
-                                EditProfileScreen(onBackClick = { navController.popBackStack() }, onSaveClick = { navController.popBackStack() })
+                            composable(route = "video_call_screen/{callId}", arguments = listOf(navArgument("callId") { type = NavType.StringType })) { backStackEntry ->
+                                val callId = backStackEntry.arguments?.getString("callId") ?: ""
+                                VideoCallScreen(callId = callId, onDisconnectClick = { navController.popBackStack() })
                             }
-                            composable("appointments_screen") {
-                                AppointmentsScreen(onReviewClick = { doctorId -> navController.navigate("review_screen/$doctorId") })
-                            }
+                            composable("profile") { ProfileScreen(onBackClick = { navController.popBackStack() }, onEditProfileClick = { navController.navigate("edit_profile") }, onLogoutSuccess = { navController.navigate("welcome") { popUpTo(0) { inclusive = true } } }) }
+                            composable("edit_profile") { EditProfileScreen(onBackClick = { navController.popBackStack() }, onSaveClick = { navController.popBackStack() }) }
+                            composable("appointments_screen") { AppointmentsScreen(onReviewClick = { navController.navigate("home_screen") }) }
                             composable("notification_screen") { NotificationScreen(onBackClick = { navController.popBackStack() }) }
                             composable("notification_setting_screen") { NotificationSettingsScreen(onBackClick = { navController.popBackStack() }) }
-                            composable("settings_screen") {
-                                SettingsScreen(onBackClick = { navController.popBackStack() }, onNotificationSettingClick = { navController.navigate("notification_setting_screen") }, onPasswordManagerClick = { navController.navigate("password_manager_screen") }, onPrivacyPolicyClick = { navController.navigate("privacy_policy_screen") }, onHelpCenterClick = { navController.navigate("help_center_screen") }, onAccountDeletedSuccess = { navController.navigate("welcome") { popUpTo(0) { inclusive = true } } })
-                            }
+                            composable("settings_screen") { SettingsScreen(onBackClick = { navController.popBackStack() }, onNotificationSettingClick = { navController.navigate("notification_setting_screen") }, onPasswordManagerClick = { navController.navigate("password_manager_screen") }, onPrivacyPolicyClick = { navController.navigate("privacy_policy_screen") }, onHelpCenterClick = { navController.navigate("help_center_screen") }, onAccountDeletedSuccess = { navController.navigate("welcome") { popUpTo(0) { inclusive = true } } }) }
                             composable("password_manager_screen") { PasswordManagerScreen(onBackClick = { navController.popBackStack() }, onChangePasswordSuccess = { navController.popBackStack() }) }
                             composable("help_center_screen") { HelpCenterScreen(onBackClick = { navController.popBackStack() }) }
                             composable("privacy_policy_screen") { PrivacyPolicyScreen(onBackClick = { navController.popBackStack() }) }

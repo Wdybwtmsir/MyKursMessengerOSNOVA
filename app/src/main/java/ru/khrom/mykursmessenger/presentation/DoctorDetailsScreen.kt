@@ -1,5 +1,8 @@
 package ru.khrom.mykursmessenger.presentation
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,196 +21,124 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ru.khrom.mykursmessenger.data.DoctorRepository
-import ru.khrom.mykursmessenger.data.getLocalAvatarRes
+import com.google.firebase.firestore.FirebaseFirestore
 import ru.khrom.mykursmessenger.ui.theme.*
 
 @Composable
 fun DoctorDetailsScreen(doctorId: String, onBackClick: () -> Unit, onStartChatClick: () -> Unit) {
     val scrollState = rememberScrollState()
-    val doctor = remember(doctorId) {
-        DoctorRepository.doctors.find { it.id == doctorId } ?: DoctorRepository.doctors.first()
+    val db = FirebaseFirestore.getInstance()
+
+    var docName by remember { mutableStateOf("Загрузка...") }
+    var docAvatarUri by remember { mutableStateOf("") }
+    var docGender by remember { mutableStateOf("Не указан") }
+
+    val docBitmap = remember(docAvatarUri) {
+        if (docAvatarUri.isNotEmpty() && docAvatarUri.contains(",")) {
+            try {
+                val pure = docAvatarUri.substringAfter(",")
+                val bytes = Base64.decode(pure, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            } catch (e: Exception) { null }
+        } else null
     }
 
-    Scaffold(
-        containerColor = MedBackground
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MedBackground)
-        ) {
+    // ИСПРАВЛЕНО: Заменили LaunchedEffect на DisposableEffect для полной изоляции от CoroutineScope
+    DisposableEffect(doctorId) {
+        val listener = if (doctorId.isNotEmpty()) {
+            db.collection("users").document(doctorId).addSnapshotListener { s, _ ->
+                if (s != null && s.exists()) {
+                    docName = s.getString("name") ?: "Врач-Специалист"
+                    docAvatarUri = s.getString("avatarUri") ?: ""
+                    docGender = s.getString("gender") ?: "Не указан"
+                }
+            }
+        } else null
+
+        onDispose {
+            listener?.remove()
+        }
+    }
+
+    Scaffold(containerColor = MedBackground) { paddingValues ->
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues).background(MedBackground)) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MedSurface)
-                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth().background(MedSurface).padding(horizontal = 8.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = null,
-                    tint = TextPrimary,
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .clickable { onBackClick() }
-                )
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = TextPrimary, modifier = Modifier.padding(8.dp).clickable { onBackClick() })
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Информация о враче",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    fontFamily = FontFamily.Default
-                )
+                Text("Информация о враче", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
             }
 
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 24.dp),
+                modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(scrollState).padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // ИСПРАВЛЕНО: Заменили AsyncImage на локальный Image(painterResource)
-                Image(
-                    painter = painterResource(id = doctor.getLocalAvatarRes()),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(110.dp)
-                        .clip(CircleShape)
-                )
+                if (docBitmap != null) {
+                    Image(bitmap = docBitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(110.dp).clip(CircleShape))
+                } else {
+                    Box(modifier = Modifier.size(110.dp).clip(CircleShape).background(MedPrimary.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Person, null, tint = MedPrimary, modifier = Modifier.size(56.dp))
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = doctor.name,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    fontFamily = FontFamily.Default
-                )
-
+                Text(text = docName, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = doctor.specialty,
-                    fontSize = 15.sp,
-                    color = MedPrimary,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Default
-                )
+                Text(text = "Онлайн-консультант дерматологии", fontSize = 15.sp, color = MedPrimary, fontWeight = FontWeight.Medium)
 
                 Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = Color(0xFFFFB800),
-                        modifier = Modifier.size(20.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    Icon(Icons.Default.Star, null, tint = Color(0xFFFFB800), modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "4.9",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        fontFamily = FontFamily.Default
-                    )
+                    Text("5.0", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "(120 отзывов)",
-                        fontSize = 14.sp,
-                        color = TextSecondary,
-                        fontFamily = FontFamily.Default
-                    )
+                    Text("(Проверенный профиль)", fontSize = 14.sp, color = TextSecondary)
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("150+", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary, fontFamily = FontFamily.Default)
-                        Text("Пациентов", fontSize = 13.sp, color = TextSecondary, fontFamily = FontFamily.Default)
+                        Text("Пол", fontSize = 14.sp, color = TextSecondary)
+                        Text(docGender, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("10 лет", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary, fontFamily = FontFamily.Default)
-                        Text("Опыт работы", fontSize = 13.sp, color = TextSecondary, fontFamily = FontFamily.Default)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("40+", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary, fontFamily = FontFamily.Default)
-                        Text("Обзоров", fontSize = 13.sp, color = TextSecondary, fontFamily = FontFamily.Default)
+                        Text("Статус", fontSize = 14.sp, color = TextSecondary)
+                        Text("В сети", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "О враче",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        fontFamily = FontFamily.Default
-                    )
+                    Text("О враче", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Доктор является высококвалифицированным специалистом в своей области с многолетним опытом диагностики и лечения сложных клинических случаев. Регулярно участвует в международных медицинских конференциях и использует передовые методы лечения.",
-                        fontSize = 14.sp,
-                        color = TextSecondary,
-                        fontFamily = FontFamily.Default,
-                        lineHeight = 22.sp,
-                        textAlign = TextAlign.Justify
+                        text = "Данный специалист зарегистрирован в единой облачной системе SkinFirst. Готов провести онлайн-диагностику кожных заболеваний, выдать экспертные рекомендации и ответить на интересующие вопросы в чате мессенджера.",
+                        fontSize = 14.sp, color = TextSecondary, lineHeight = 22.sp, textAlign = TextAlign.Justify
                     )
                 }
-
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            Surface(
-                tonalElevation = 8.dp,
-                color = MedSurface,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
-                ) {
+            Surface(tonalElevation = 8.dp, color = MedSurface, modifier = Modifier.fillMaxWidth()) {
+                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
                     Button(
                         onClick = { onStartChatClick() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MedPrimary),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        Text(
-                            text = "Book Appointment",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MedSurface,
-                            fontFamily = FontFamily.Default
-                        )
+                        Text("Забронировать прием", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MedSurface)
                     }
                 }
             }
