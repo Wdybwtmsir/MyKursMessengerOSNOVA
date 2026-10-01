@@ -1,5 +1,6 @@
 package ru.khrom.mykursmessenger.presentation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,13 +19,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import ru.khrom.mykursmessenger.data.Doctor
 import ru.khrom.mykursmessenger.data.DoctorRepository
+import ru.khrom.mykursmessenger.data.getLocalAvatarRes
 import ru.khrom.mykursmessenger.ui.theme.*
 
 @Composable
@@ -33,7 +35,6 @@ fun DoctorListScreen(onDoctorClick: (String) -> Unit, onProfileClick: () -> Unit
     var selectedGenderFilter by remember { mutableStateOf("All") }
     val filters = listOf("All", "Male", "Female")
 
-    // Чистый вызов глобального репозитория сетевых ссылок
     val doctors = remember { DoctorRepository.doctors }
 
     val filteredDoctors = doctors.filter { doctor ->
@@ -151,8 +152,9 @@ fun DoctorCardItem(doctor: Doctor, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box {
-                AsyncImage(
-                    model = doctor.avatarUrl,
+                // ИСПРАВЛЕНО: Читаем локальный ресурс через painterResource без интернета
+                Image(
+                    painter = painterResource(id = doctor.getLocalAvatarRes()),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

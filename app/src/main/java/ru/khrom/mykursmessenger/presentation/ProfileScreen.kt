@@ -1,8 +1,22 @@
 package ru.khrom.mykursmessenger.presentation
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,21 +28,33 @@ import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Male
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import ru.khrom.mykursmessenger.ui.theme.*
@@ -51,8 +77,20 @@ fun ProfileScreen(
     var userGender by remember { mutableStateOf("Не указан") }
     var userAvatarUrl by remember { mutableStateOf("") }
 
-    LaunchedEffect(userId) {
-        if (userId.isNotEmpty()) {
+    val avatarBitmap = remember(userAvatarUrl) {
+        if (userAvatarUrl.isNotEmpty() && userAvatarUrl.contains(",")) {
+            try {
+                val pureBase64 = userAvatarUrl.substringAfter(",")
+                val decodedBytes = Base64.decode(pureBase64, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    }
+
+    DisposableEffect(userId) {
+        val listener = if (userId.isNotEmpty()) {
             db.collection("users").document(userId).addSnapshotListener { snapshot, _ ->
                 if (snapshot != null && snapshot.exists()) {
                     userName = snapshot.getString("name") ?: userEmail.substringBefore("@")
@@ -64,6 +102,10 @@ fun ProfileScreen(
                     userName = userEmail.substringBefore("@")
                 }
             }
+        } else null
+
+        onDispose {
+            listener?.remove()
         }
     }
 
@@ -87,7 +129,7 @@ fun ProfileScreen(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = null,
                     tint = TextPrimary,
-                    modifier = Modifier.padding(8.dp).clickable { onBackClick() }
+                    modifier = Modifier.padding(all = 8.dp).clickable { onBackClick() }
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text("Profile", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary, fontFamily = FontFamily.Default)
@@ -97,19 +139,19 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (userAvatarUrl.isNotEmpty()) {
-                    AsyncImage(
-                        model = userAvatarUrl,
+                if (avatarBitmap != null) {
+                    Image(
+                        bitmap = avatarBitmap.asImageBitmap(),
                         contentDescription = null,
-                        modifier = Modifier.size(96.dp).clip(CircleShape),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(96.dp).clip(CircleShape)
                     )
                 } else {
                     Box(
                         modifier = Modifier.size(96.dp).clip(CircleShape).background(MedPrimary.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = userName.take(1).uppercase(), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = MedPrimary)
+                        Icon(Icons.Default.Person, null, tint = MedPrimary, modifier = Modifier.size(48.dp))
                     }
                 }
 
@@ -118,14 +160,14 @@ fun ProfileScreen(
                 Text(text = userEmail, fontSize = 14.sp, color = TextSecondary, fontFamily = FontFamily.Default)
             }
 
-            // Блок вывода личной информации пользователя напрямую из Firestore
             Text(text = "Personal Info", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextSecondary, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+
             Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, bottom = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MedSurface)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(all = 16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Phone, null, tint = SplashBackground, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(12.dp))
@@ -155,9 +197,11 @@ fun ProfileScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
             Text(text = "Account Actions", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextSecondary, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+
             Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, bottom = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MedSurface)
             ) {
@@ -178,10 +222,10 @@ fun ProfileScreen(
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
-
 @Composable
 fun ProfileMenuItem(icon: ImageVector, title: String, titleColor: Color = TextPrimary, iconTint: Color = SplashBackground, onClick: () -> Unit) {
     Row(

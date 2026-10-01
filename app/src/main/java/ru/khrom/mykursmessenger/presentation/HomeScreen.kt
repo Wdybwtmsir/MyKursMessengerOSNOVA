@@ -1,6 +1,9 @@
 package ru.khrom.mykursmessenger.presentation
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -22,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -29,22 +34,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import ru.khrom.mykursmessenger.R
+import ru.khrom.mykursmessenger.data.CalendarDay
 import ru.khrom.mykursmessenger.data.Doctor
 import ru.khrom.mykursmessenger.data.DoctorRepository
+import ru.khrom.mykursmessenger.data.getLocalAvatarRes
 import ru.khrom.mykursmessenger.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
-
-data class CalendarDay(
-    val day: String,
-    val name: String,
-    val isSelected: Boolean = false
-)
 
 @Composable
 fun HomeScreen(
@@ -59,24 +59,38 @@ fun HomeScreen(
     val userEmail = auth.currentUser?.email ?: "example@mail.com"
 
     var userName by remember { mutableStateOf("Пациент") }
-    var userAvatarUri by remember { mutableStateOf<Uri?>(null) }
+    var userAvatarUrl by remember { mutableStateOf("") }
 
     var homeSearchQuery by remember { mutableStateOf("") }
     var isFavoriteTabSelected by remember { mutableStateOf(false) }
 
-    LaunchedEffect(userId) {
-        if (userId.isNotEmpty()) {
+    val avatarBitmap = remember(userAvatarUrl) {
+        if (userAvatarUrl.isNotEmpty() && userAvatarUrl.contains(",")) {
+            try {
+                val pureBase64 = userAvatarUrl.substringAfter(",")
+                val decodedBytes = Base64.decode(pureBase64, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    }
+
+    DisposableEffect(userId) {
+        val listener = if (userId.isNotEmpty()) {
             db.collection("users").document(userId).addSnapshotListener { snapshot, _ ->
                 if (snapshot != null && snapshot.exists()) {
                     val nameFromDb = snapshot.getString("name")
                     userName = if (!nameFromDb.isNullOrEmpty()) nameFromDb else userEmail.substringBefore("@")
-
-                    val uriStr = snapshot.getString("avatarUri")
-                    userAvatarUri = if (!uriStr.isNullOrEmpty()) uriStr.toUri() else null
+                    userAvatarUrl = snapshot.getString("avatarUri") ?: ""
                 } else {
                     userName = userEmail.substringBefore("@")
                 }
             }
+        } else null
+
+        onDispose {
+            listener?.remove()
         }
     }
 
@@ -108,8 +122,8 @@ fun HomeScreen(
         val calendar = Calendar.getInstance()
         val dayNum = calendar.get(Calendar.DAY_OF_MONTH)
         val dayNameFormat = SimpleDateFormat("EEEE", Locale.US)
-        val dayName = dayNameFormat.format(calendar.time)
-        "$dayNum $dayName - Today"
+        val formattedName = dayNameFormat.format(calendar.time)
+        "$dayNum $formattedName - Today"
     }
 
     val doctors = remember { DoctorRepository.doctors }
@@ -140,14 +154,14 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (userAvatarUri != null) {
-                            AsyncImage(
-                                model = userAvatarUri,
+                        if (avatarBitmap != null) {
+                            Image(
+                                bitmap = avatarBitmap.asImageBitmap(),
                                 contentDescription = null,
+                                contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .size(48.dp)
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
+                                    .clip(CircleShape)
                             )
                         } else {
                             Box(
@@ -157,13 +171,7 @@ fun HomeScreen(
                                     .background(MedPrimary.copy(alpha = 0.2f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = userName.take(1).uppercase(),
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MedPrimary,
-                                    fontFamily = FontFamily.Default
-                                )
+                                Icon(Icons.Default.Person, null, tint = MedPrimary)
                             }
                         }
 
@@ -171,7 +179,7 @@ fun HomeScreen(
 
                         Column {
                             Text(
-                                text = "Hi, WelcomeBack",
+                                text = "Добро пожаловать",
                                 fontSize = 13.sp,
                                 color = TextSecondary,
                                 fontFamily = FontFamily.Default
@@ -235,7 +243,8 @@ fun HomeScreen(
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,modifier = Modifier.clickable { isFavoriteTabSelected = true }
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable { isFavoriteTabSelected = true }
                     ) {
                         Icon(
                             Icons.Default.Search,
@@ -278,6 +287,7 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
+// Явно передаем тип элементов для исключения ошибки Cannot infer type
                     items(items = days) { dayItem: CalendarDay ->
                         Box(
                             modifier = Modifier
@@ -367,8 +377,8 @@ fun HomeScreen(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            AsyncImage(
-                                model = doc.avatarUrl,
+                            Image(
+                                painter = painterResource(id = doc.getLocalAvatarRes()),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier

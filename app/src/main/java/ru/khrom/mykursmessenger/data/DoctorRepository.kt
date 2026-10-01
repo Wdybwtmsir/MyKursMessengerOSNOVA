@@ -9,7 +9,7 @@ object DoctorRepository {
             lastMessage = "Здравствуйте! Как успехи?",
             time = "10:30",
             isOnline = true,
-            avatarUrl = "https://unsplash.com",
+            avatarUrl = "doc_alex", // Текстовый идентификатор картинки
             gender = "Male",
             isFavorite = true
         ),
@@ -20,7 +20,7 @@ object DoctorRepository {
             lastMessage = "Пришлите результаты анализов.",
             time = "Вчера",
             isOnline = false,
-            avatarUrl = "https://unsplash.com",
+            avatarUrl = "doc_maria", // Текстовый идентификатор картинки
             gender = "Female",
             isFavorite = false
         ),
@@ -31,7 +31,7 @@ object DoctorRepository {
             lastMessage = "Жду вас на повторный прием.",
             time = "2 дня назад",
             isOnline = true,
-            avatarUrl = "https://unsplash.com",
+            avatarUrl = "doc_sergey", // Текстовый идентификатор картинки
             gender = "Male",
             isFavorite = true
         ),
@@ -42,7 +42,7 @@ object DoctorRepository {
             lastMessage = "Рецепт я обновила.",
             time = "05.10",
             isOnline = false,
-            avatarUrl = "https://unsplash.com",
+            avatarUrl = "doc_elena", // Текстовый идентификатор картинки
             gender = "Female",
             isFavorite = false
         )

@@ -1,5 +1,6 @@
 package ru.khrom.mykursmessenger.presentation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,20 +18,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import ru.khrom.mykursmessenger.data.DoctorRepository
+import ru.khrom.mykursmessenger.data.getLocalAvatarRes
 import ru.khrom.mykursmessenger.ui.theme.*
 
 @Composable
 fun DoctorDetailsScreen(doctorId: String, onBackClick: () -> Unit, onStartChatClick: () -> Unit) {
     val scrollState = rememberScrollState()
-
-    // Берем данные строго из сетевого репозитория DoctorRepository
     val doctor = remember(doctorId) {
         DoctorRepository.doctors.find { it.id == doctorId } ?: DoctorRepository.doctors.first()
     }
@@ -79,9 +79,9 @@ fun DoctorDetailsScreen(doctorId: String, onBackClick: () -> Unit, onStartChatCl
             ) {
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Заменили Image на AsyncImage для сетевой аватарки URL
-                AsyncImage(
-                    model = doctor.avatarUrl,
+                // ИСПРАВЛЕНО: Заменили AsyncImage на локальный Image(painterResource)
+                Image(
+                    painter = painterResource(id = doctor.getLocalAvatarRes()),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

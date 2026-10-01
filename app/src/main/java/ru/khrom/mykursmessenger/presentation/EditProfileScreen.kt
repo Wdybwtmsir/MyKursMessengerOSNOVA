@@ -1,12 +1,16 @@
 package ru.khrom.mykursmessenger.presentation
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -27,10 +32,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import ru.khrom.mykursmessenger.ui.theme.*
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 
 @Composable
 fun EditProfileScreen(onBackClick: () -> Unit, onSaveClick: () -> Unit) {
@@ -44,28 +50,62 @@ fun EditProfileScreen(onBackClick: () -> Unit, onSaveClick: () -> Unit) {
     var phoneInput by remember { mutableStateOf("") }
     var birthDateInput by remember { mutableStateOf("") }
     var genderInput by remember { mutableStateOf("") }
-    var selectedAvatarUrl by remember { mutableStateOf("") }
+    var base64Avatar by remember { mutableStateOf("") }
     var isPending by remember { mutableStateOf(false) }
 
-    // Готовый набор медицинских аватарок из интернета, чтобы не использовать платный Storage
-    val predefinedAvatars = listOf(
-        "https://unsplash.com", // Девушка
-        "https://unsplash.com", // Парень
-        "https://unsplash.com", // Женщина
-        "https://unsplash.com"  // Мужчина
-    )
+    val avatarBitmap = remember(base64Avatar) {
+        if (base64Avatar.isNotEmpty() && base64Avatar.contains(",")) {
+            try {
+                val pureBase64 = base64Avatar.substringAfter(",")
+                val decodedBytes = Base64.decode(pureBase64, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    }
 
-    LaunchedEffect(userId) {
-        if (userId.isNotEmpty()) {
-            db.collection("users").document(userId).get().addOnSuccessListener { snapshot ->
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { selectedUri ->
+            try {
+                val inputStream: InputStream? = context.contentResolver.openInputStream(selectedUri)
+                val originalBitmap = BitmapFactory.decodeStream(inputStream)
+
+                if (originalBitmap != null) {
+                    val targetWidth = 250
+                    val targetHeight = (originalBitmap.height * (250.0 / originalBitmap.width)).toInt()
+                    val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, targetWidth, targetHeight, true)
+
+                    val outputStream = ByteArrayOutputStream()
+                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 60, outputStream)
+                    val byteArray = outputStream.toByteArray()
+
+                    base64Avatar = "data:image/jpeg;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(context, "Не удалось обработать фото", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    DisposableEffect(userId) {
+        val listener = if (userId.isNotEmpty()) {
+            db.collection("users").document(userId).addSnapshotListener { snapshot, _ ->
                 if (snapshot != null && snapshot.exists()) {
                     nameInput = snapshot.getString("name") ?: ""
                     phoneInput = snapshot.getString("phone") ?: ""
                     birthDateInput = snapshot.getString("birthDate") ?: ""
                     genderInput = snapshot.getString("gender") ?: ""
-                    selectedAvatarUrl = snapshot.getString("avatarUri") ?: ""
+                    base64Avatar = snapshot.getString("avatarUri") ?: ""
                 }
             }
+        } else null
+
+        onDispose {
+            listener?.remove()
         }
     }
 
@@ -94,7 +134,7 @@ fun EditProfileScreen(onBackClick: () -> Unit, onSaveClick: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Edit Profile",
+                    text = "Редактировать профиль",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
@@ -112,101 +152,112 @@ fun EditProfileScreen(onBackClick: () -> Unit, onSaveClick: () -> Unit) {
             ) {
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Главное выбранное изображение профиля
-                if (selectedAvatarUrl.isNotEmpty()) {
-                    AsyncImage(
-                        model = selectedAvatarUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape)
-                            .background(MedPrimary.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Person, null, tint = MedPrimary, modifier = Modifier.size(48.dp))
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Choose Your Avatar", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextSecondary)
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Горизонтальная лента для выбора готовой аватарки кликом (без Storage!)
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(bottom = 24.dp)
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                        .clip(CircleShape)
+                        .background(SplashBackground.copy(alpha = 0.1f))
+                        .clickable(enabled = !isPending) { galleryLauncher.launch("image/*") },
+                    contentAlignment = Alignment.Center
                 ) {
-                    items(predefinedAvatars) { url ->
-                        val isSelected = selectedAvatarUrl == url
-                        AsyncImage(
-                            model = url,
+                    if (avatarBitmap != null) {
+                        Image(
+                            bitmap = avatarBitmap.asImageBitmap(),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(60.dp)
-                                .clip(CircleShape)
-                                .border(
-                                    width = if (isSelected) 3.dp else 1.dp,
-                                    color = if (isSelected) SplashBackground else Color.Transparent,
-                                    shape = CircleShape
-                                )
-                                .clickable { selectedAvatarUrl = url }
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = SplashBackground,
+                            modifier = Modifier.size(56.dp)
                         )
                     }
                 }
 
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Нажмите, чтобы изменить фото",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = SplashBackground,
+                    modifier = Modifier.clickable(enabled = !isPending) { galleryLauncher.launch("image/*") }
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Исправлено: жестко прописали цвета focusedTextColor и unfocusedTextColor во все поля
                 OutlinedTextField(
                     value = nameInput,
                     onValueChange = { nameInput = it },
-                    label = { Text("Full Name", fontFamily = FontFamily.Default) },
-                    textStyle = TextStyle(fontFamily = FontFamily.Default, fontSize = 16.sp),
+                    label = { Text("ФИО", fontFamily = FontFamily.Default) },
+                    textStyle = TextStyle(fontFamily = FontFamily.Default, fontSize = 16.sp, color = TextPrimary),
                     enabled = !isPending,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, focusedContainerColor = MedSurface, unfocusedContainerColor = MedSurface)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedLabelColor = SplashBackground,
+                        unfocusedLabelColor = TextSecondary,
+                        focusedContainerColor = MedSurface,
+                        unfocusedContainerColor = MedSurface
+                    )
                 )
 
                 OutlinedTextField(
                     value = phoneInput,
                     onValueChange = { phoneInput = it },
-                    label = { Text("Phone Number", fontFamily = FontFamily.Default) },
-                    textStyle = TextStyle(fontFamily = FontFamily.Default, fontSize = 16.sp),
+                    label = { Text("Номер телефона", fontFamily = FontFamily.Default) },
+                    textStyle = TextStyle(fontFamily = FontFamily.Default, fontSize = 16.sp, color = TextPrimary),
                     enabled = !isPending,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, focusedContainerColor = MedSurface, unfocusedContainerColor = MedSurface)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedLabelColor = SplashBackground,
+                        unfocusedLabelColor = TextSecondary,
+                        focusedContainerColor = MedSurface,
+                        unfocusedContainerColor = MedSurface
+                    )
                 )
-
                 OutlinedTextField(
                     value = birthDateInput,
                     onValueChange = { birthDateInput = it },
-                    label = { Text("Birth Date (DD/MM/YYYY)", fontFamily = FontFamily.Default) },
-                    textStyle = TextStyle(fontFamily = FontFamily.Default, fontSize = 16.sp),
+                    label = { Text("Дата рождения (ДД/ММ/ГГГГ)", fontFamily = FontFamily.Default) },
+                    textStyle = TextStyle(fontFamily = FontFamily.Default, fontSize = 16.sp, color = TextPrimary),
                     enabled = !isPending,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, focusedContainerColor = MedSurface, unfocusedContainerColor = MedSurface)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedLabelColor = SplashBackground,
+                        unfocusedLabelColor = TextSecondary,
+                        focusedContainerColor = MedSurface,
+                        unfocusedContainerColor = MedSurface
+                    )
                 )
-
                 OutlinedTextField(
                     value = genderInput,
                     onValueChange = { genderInput = it },
-                    label = { Text("Gender", fontFamily = FontFamily.Default) },
-                    textStyle = TextStyle(fontFamily = FontFamily.Default, fontSize = 16.sp),
+                    label = { Text("Пол", fontFamily = FontFamily.Default) },
+                    textStyle = TextStyle(fontFamily = FontFamily.Default, fontSize = 16.sp, color = TextPrimary),
                     enabled = !isPending,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, focusedContainerColor = MedSurface, unfocusedContainerColor = MedSurface)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedLabelColor = SplashBackground,
+                        unfocusedLabelColor = TextSecondary,
+                        focusedContainerColor = MedSurface,
+                        unfocusedContainerColor = MedSurface
+                    )
                 )
             }
-
             Surface(
                 tonalElevation = 8.dp,
                 color = MedSurface,
@@ -228,7 +279,7 @@ fun EditProfileScreen(onBackClick: () -> Unit, onSaveClick: () -> Unit) {
                                         "phone" to phoneInput.trim(),
                                         "birthDate" to birthDateInput.trim(),
                                         "gender" to genderInput.trim(),
-                                        "avatarUri" to selectedAvatarUrl.trim()
+                                        "avatarUri" to base64Avatar.trim()
                                     )
                                     db.collection("users").document(userId).set(updates, com.google.firebase.firestore.SetOptions.merge())
                                         .addOnSuccessListener {
@@ -237,7 +288,7 @@ fun EditProfileScreen(onBackClick: () -> Unit, onSaveClick: () -> Unit) {
                                         }
                                         .addOnFailureListener {
                                             isPending = false
-                                            Toast.makeText(context, "Ошибка сохранения данных", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Ошибка сохранения", Toast.LENGTH_SHORT).show()
                                         }
                                 }
                             },
@@ -246,7 +297,7 @@ fun EditProfileScreen(onBackClick: () -> Unit, onSaveClick: () -> Unit) {
                             shape = RoundedCornerShape(16.dp),
                             enabled = nameInput.isNotBlank()
                         ) {
-                            Text("Save Changes", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MedSurface)
+                            Text("Сохранить изменения", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MedSurface)
                         }
                     }
                 }

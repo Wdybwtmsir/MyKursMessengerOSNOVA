@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ru.khrom.mykursmessenger.data.CalendarDay // ИМПОРТ ИЗ ПАПКИ DATA
 import ru.khrom.mykursmessenger.data.Doctor
 import ru.khrom.mykursmessenger.data.DoctorRepository
 import ru.khrom.mykursmessenger.ui.theme.*
@@ -111,7 +112,7 @@ fun ScheduleScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    dates.forEachIndexed { index, day ->
+                    dates.forEachIndexed { index, day: CalendarDay ->
                         val isSelected = selectedDateTab == index
                         Box(
                             modifier = Modifier
